@@ -649,6 +649,7 @@ static pthread_mutex_t wait_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t wait_cond = PTHREAD_COND_INITIALIZER;
 static size_t nr_to_startup;
 static int set_thread_affinity = 1;
+static char *daxdev = NULL;
 
 static void *thread_start(void *data) {
   per_thread_t *args = data;
@@ -730,8 +731,8 @@ static void *thread_start(void *data) {
     // generate buffers
     args->x.load_arena = (char *)alloc_arena_mmap(
                              page_size, use_thp,
-                             args->x.load_total_memory + args->x.load_offset) +
-                         args->x.load_offset;
+                             args->x.load_total_memory + args->x.load_offset,
+			     daxdev) + args->x.load_offset;
     memset(args->x.load_arena, 1,
            args->x.load_total_memory);  // ensure pages are mapped
   }
@@ -793,7 +794,7 @@ int main(int argc, char **argv) {
 
   setvbuf(stdout, NULL, _IOLBF, BUFSIZ);
 
-  while ((c = getopt(argc, argv, "ac:l:F:p:Hm:n:oO:S:s:T:t:vXyW:")) != -1) {
+  while ((c = getopt(argc, argv, "ac:d:l:F:p:Hm:n:oO:S:s:T:t:vXyW:")) != -1) {
     switch (c) {
       case 'a':
         print_average = 1;
@@ -842,6 +843,10 @@ int main(int argc, char **argv) {
           exit(1);
         }
         break;
+      case 'd':
+	daxdev = optarg;
+	page_size = 2 * 1024 *1024;
+	break;
       case 'F':
         if (parse_mem_arg(optarg, &cache_flush_size)) {
           fprintf(stderr,
@@ -851,6 +856,10 @@ int main(int argc, char **argv) {
         }
         break;
       case 'p':
+	if (daxdev) {
+          fprintf(stderr, "page size cannot be specified with dax memory\n");
+          exit(1);
+	}
         if (parse_mem_arg(optarg, &page_size)) {
           fprintf(stderr,
                   "Error: page_size must be a non-negative integer (suffixed "
@@ -1006,6 +1015,9 @@ int main(int argc, char **argv) {
     }
     fprintf(stderr, "         default: %s\n", chases[0].name);
     fprintf(stderr,
+            "-d <daxdev>    test dax memory (e.g. /dev/dax0.0) "
+	    "instead of general purpose memory\n");
+    fprintf(stderr,
             "-l memload     select one of several different memloads:\n");
     for (i = 0; i < sizeof(memloads) / sizeof(memloads[0]); ++i) {
       fprintf(stderr, "   %-12s%s\n", memloads[i].usage1, memloads[i].usage2);
@@ -1131,15 +1143,16 @@ int main(int argc, char **argv) {
     if (verbosity > 2) printf("allocate genchase_args.arena\n");
     genchase_args.arena =
         (char *)alloc_arena_mmap(page_size, use_thp,
-                                 genchase_args.total_memory + offset) +
-        offset;
+                                 genchase_args.total_memory + offset, daxdev) +
+      offset;
   }
   per_thread_t *thread_data = alloc_arena_mmap(
-      default_page_size, false, nr_threads * sizeof(per_thread_t));
+       default_page_size, false, nr_threads * sizeof(per_thread_t), daxdev);
   void *flush_arena = NULL;
   if (verbosity > 2) printf("allocate cache flush\n");
   if (cache_flush_size) {
-    flush_arena = alloc_arena_mmap(default_page_size, false, cache_flush_size);
+    flush_arena = alloc_arena_mmap(default_page_size, false, cache_flush_size,
+				   daxdev);
     memset(flush_arena, 1, cache_flush_size);  // ensure pages are mapped
   }
 

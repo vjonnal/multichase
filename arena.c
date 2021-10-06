@@ -22,8 +22,11 @@
 #include <sys/shm.h>
 #include <sys/syscall.h>
 #include <unistd.h>
+#include <pthread.h>
 
 #include "permutation.h"
+
+#include "cursor_heap.h"
 
 extern int verbosity;
 extern int is_weighted_mbind;
@@ -229,12 +232,48 @@ static void check_thp_state(void) {
   free(defrag);
 }
 
-void *alloc_arena_mmap(size_t page_size, bool use_thp, size_t arena_size) {
+static pthread_mutex_t cheap_mutex = PTHREAD_MUTEX_INITIALIZER;
+static struct cheap *h = NULL;
+
+static void *alloc_arena_mmap_dax(size_t page_size, size_t arena_size,
+				  const char *daxdev)
+{
+  void *arena;
+
+  pthread_mutex_lock(&cheap_mutex); /* multiload calls from threads */
+  if (!h) {
+    /* Map the dax memory as a cursor_heap */
+    h = cheap_create_dax(daxdev, 0);
+
+    if (!h) {
+      fprintf(stderr,
+	      "Failed to create a cursor_heap from dax dev %s\n", daxdev);
+      exit(1);
+    }
+    printf("Allocated cursor_heap size %ld\n", h->size);
+  }
+
+  /* Get this arena from the cursor_heap */
+  arena = cheap_memalign(h,
+			 page_size, /* alignment */
+			 arena_size);
+  pthread_mutex_unlock(&cheap_mutex);
+  if (arena) memset(arena, 0, arena_size);
+
+  return arena;
+}
+
+void *alloc_arena_mmap(size_t page_size, bool use_thp, size_t arena_size,
+		       const char *daxdev) {
   void *arena;
   size_t pagemask = page_size - 1;
   int flags = MAP_PRIVATE | MAP_ANONYMOUS | get_page_size_flags(page_size);
 
   arena_size = (arena_size + pagemask) & ~pagemask;
+
+  if (daxdev)
+    return alloc_arena_mmap_dax(page_size, arena_size, daxdev);
+
   arena = mmap(0, arena_size, PROT_READ | PROT_WRITE, flags, -1, 0);
   if (arena == MAP_FAILED) {
     perror("mmap");

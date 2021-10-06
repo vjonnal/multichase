@@ -498,6 +498,7 @@ int main(int argc, char **argv) {
   const char *chase_optarg = chases[0].name;
   const chase_t *chase = &chases[0];
   struct generate_chase_common_args genchase_args;
+  char *daxdev = NULL;
 
   genchase_args.total_memory = DEF_TOTAL_MEMORY;
   genchase_args.stride = DEF_STRIDE;
@@ -506,7 +507,7 @@ int main(int argc, char **argv) {
 
   setvbuf(stdout, NULL, _IOLBF, BUFSIZ);
 
-  while ((c = getopt(argc, argv, "ac:F:p:Hm:n:oO:S:s:T:t:vXyW:")) != -1) {
+  while ((c = getopt(argc, argv, "ac:d:F:p:Hm:n:oO:S:s:T:t:vXyW:")) != -1) {
     switch (c) {
       case 'a':
         print_average = 1;
@@ -538,6 +539,10 @@ int main(int argc, char **argv) {
           exit(1);
         }
         break;
+      case 'd':
+	daxdev = optarg;
+	page_size = 2 * 1024 *1024;
+	break;
       case 'F':
         if (parse_mem_arg(optarg, &cache_flush_size)) {
           fprintf(stderr,
@@ -547,6 +552,10 @@ int main(int argc, char **argv) {
         }
         break;
       case 'p':
+	if (daxdev) {
+          fprintf(stderr, "page size cannot be specified with dax memory\n");
+          exit(1);
+	}
         if (parse_mem_arg(optarg, &page_size)) {
           fprintf(stderr,
                   "page size must be a non-negative integer (suffixed with k, "
@@ -651,6 +660,9 @@ int main(int argc, char **argv) {
     for (i = 0; i < sizeof(chases) / sizeof(chases[0]); ++i) {
       fprintf(stderr, "   %-12s%s\n", chases[i].usage1, chases[i].usage2);
     }
+    fprintf(stderr,
+            "-d <daxdev>    test dax memory (e.g. /dev/dax0.0) "
+	    "instead of general purpose memory\n");
     fprintf(stderr, "               default: %s\n", chases[0].name);
     fprintf(stderr, "-m nnnn[kmg]   total memory size (default %zu)\n",
             DEF_TOTAL_MEMORY);
@@ -757,13 +769,14 @@ int main(int argc, char **argv) {
   // generate the chases by launching multiple threads
   genchase_args.arena =
       (char *)alloc_arena_mmap(page_size, use_thp,
-                               genchase_args.total_memory + offset) +
+                               genchase_args.total_memory + offset, daxdev) +
       offset;
   per_thread_t *thread_data = alloc_arena_mmap(
-      default_page_size, false, nr_threads * sizeof(per_thread_t));
+       default_page_size, false, nr_threads * sizeof(per_thread_t), daxdev);
   void *flush_arena = NULL;
   if (cache_flush_size) {
-    flush_arena = alloc_arena_mmap(default_page_size, false, cache_flush_size);
+    flush_arena = alloc_arena_mmap(default_page_size, false, cache_flush_size,
+				   daxdev);
     memset(flush_arena, 1, cache_flush_size);  // ensure pages are mapped
   }
 
