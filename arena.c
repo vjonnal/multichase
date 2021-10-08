@@ -258,8 +258,15 @@ static void *alloc_arena_mmap_dax(size_t page_size, size_t arena_size,
 			 page_size, /* alignment */
 			 arena_size);
   pthread_mutex_unlock(&cheap_mutex);
-  if (arena) memset(arena, 0, arena_size);
-
+  if (arena) {
+    memset(arena, 0, arena_size);
+  }
+  else {
+    fprintf(stderr, "%s: cursor_heap allocation of %ld bytes failed; "
+	    "used/available: %ld/%ld\n", __func__, arena_size,
+	    cheap_used(h), cheap_avail(h));
+    exit(-1);
+  }
   return arena;
 }
 
