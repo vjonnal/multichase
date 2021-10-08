@@ -11,9 +11,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+
+CH_LIB=libcursor_heap.a
+CH_PATH=./cursor_heap/build
+CURSOR_HEAP_LIB=$(CH_PATH)/$(CH_LIB)
+
 CFLAGS=-std=gnu99 -g -O3 -fomit-frame-pointer -fno-unroll-loops -Wall -Wstrict-prototypes -Wmissing-prototypes -Wshadow -Wmissing-declarations -Wnested-externs -Wpointer-arith -W -Wno-unused-parameter -Werror -pthread -Wno-tautological-compare
+CFLAGS+= -I ./cursor_heap
 LDFLAGS=-g -O3 -pthread
 LDLIBS=-lrt -lm
+LDLIBS+= -L$(CH_PATH) -l cursor_heap
 
 ARCH ?= $(shell uname -m)
 
@@ -24,9 +31,18 @@ ifeq ($(ARCH),aarch64)
  endif
 endif
 
+#TODO: convert use submodule instead of this stanza
+CURSOR_HEAP_URL=https://github.com/jagalactic/cursor_heap.git
+cursor_heap:
+	git clone $(CURSOR_HEAP_URL)
+
+$(CURSOR_HEAP_LIB):  cursor_heap
+	mkdir -p $(CH_PATH)
+	cd $(CH_PATH); cmake .. ; make
+
 EXE=multichase multiload fairness pingpong
 
-all: $(EXE)
+all: $(CURSOR_HEAP_LIB) $(EXE)
 
 clean:
 	rm -f $(EXE) *.o expand.h
