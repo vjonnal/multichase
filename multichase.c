@@ -660,10 +660,10 @@ int main(int argc, char **argv) {
     for (i = 0; i < sizeof(chases) / sizeof(chases[0]); ++i) {
       fprintf(stderr, "   %-12s%s\n", chases[i].usage1, chases[i].usage2);
     }
+    fprintf(stderr, "               default: %s\n", chases[0].name);
     fprintf(stderr,
             "-d <daxdev>    test dax memory (e.g. /dev/dax0.0) "
 	    "instead of general purpose memory\n");
-    fprintf(stderr, "               default: %s\n", chases[0].name);
     fprintf(stderr, "-m nnnn[kmg]   total memory size (default %zu)\n",
             DEF_TOTAL_MEMORY);
     fprintf(stderr,
