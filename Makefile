@@ -18,8 +18,10 @@ CURSOR_HEAP_LIB=$(CH_PATH)/$(CH_LIB)
 
 CFLAGS=-std=gnu99 -g -O3 -fomit-frame-pointer -fno-unroll-loops -Wall -Wstrict-prototypes -Wmissing-prototypes -Wshadow -Wmissing-declarations -Wnested-externs -Wpointer-arith -W -Wno-unused-parameter -Werror -pthread -Wno-tautological-compare
 CFLAGS+= -I ./cursor_heap
+CFLAGS+= -DNON_TEMPORAL_WRITE
+CFLAGS+= -DCHEAP_DAX_ALIGN_SIXTYFOUR_BYTE
 LDFLAGS=-g -O3 -pthread
-LDLIBS=-lrt -lm
+LDLIBS=-lrt -lm -lpmem
 LDLIBS+= -L$(CH_PATH) -l cursor_heap
 
 ARCH ?= $(shell uname -m)

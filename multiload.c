@@ -24,6 +24,7 @@
 #include <sys/time.h>
 #include <time.h>
 #include <unistd.h>
+#include <libpmem.h>
 
 #include "arena.h"
 #include "cpu_util.h"
@@ -461,7 +462,11 @@ static void load_memcpy_libc(per_thread_t *t) {
     tmp = a;
     a = b;
     b = tmp;
+#ifdef NON_TEMPORAL_WRITE
+    pmem_memcpy((void *)a, (void *)b, load_loop, PMEM_F_MEM_NONTEMPORAL);
+#else
     memcpy((void *)a, (void *)b, load_loop);
+#endif
     LOAD_MEMORY_SAMPLE_MIBPS
   } while (1);
 #undef LOOP_OPS
@@ -475,7 +480,11 @@ static void load_memset_libc(per_thread_t *t) {
 
   LOAD_MEMORY_INIT_MIBPS
   do {
+#ifdef NON_TEMPORAL_WRITE
+    pmem_memset((void *)a, 0xdeadbeef, load_bites, PMEM_F_MEM_NONTEMPORAL);
+#else
     memset((void *)a, 0xdeadbeef, load_bites);
+#endif
     LOAD_MEMORY_SAMPLE_MIBPS
   } while (1);
 #undef LOOP_OPS
@@ -489,7 +498,11 @@ static void load_memsetz_libc(per_thread_t *t) {
 
   LOAD_MEMORY_INIT_MIBPS
   do {
+#ifdef NON_TEMPORAL_WRITE
+    pmem_memset((void *)a, 0, load_bites, PMEM_F_MEM_NONTEMPORAL);
+#else
     memset((void *)a, 0, load_bites);
+#endif
     LOAD_MEMORY_SAMPLE_MIBPS
   } while (1);
 #undef LOOP_OPS

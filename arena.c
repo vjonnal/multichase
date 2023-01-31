@@ -243,7 +243,11 @@ static void *alloc_arena_mmap_dax(size_t page_size, size_t arena_size,
   pthread_mutex_lock(&cheap_mutex); /* multiload calls from threads */
   if (!h) {
     /* Map the dax memory as a cursor_heap */
+#ifdef CHEAP_DAX_ALIGN_SIXTYFOUR_BYTE
+    h = cheap_create_dax(daxdev, 64);
+#else
     h = cheap_create_dax(daxdev, 0);
+#endif
 
     if (!h) {
       fprintf(stderr,
